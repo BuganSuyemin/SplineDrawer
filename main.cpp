@@ -2,6 +2,36 @@
 #include <iostream>
 //#include "BuganDrawing.cpp"
 
+struct BezierPoint
+{
+public:
+	SDL_Point Point;
+	SDL_Point HandlePrev;
+	SDL_Point HandleNext;
+
+	BezierPoint(SDL_Point point, SDL_Point handlePrev, SDL_Point handleNext)
+	{
+		Point = point;
+		HandlePrev = handlePrev;
+		HandleNext = handleNext;
+	}
+
+	BezierPoint(int px, int py, int hpx, int hpy, int hnx, int hny)
+	{
+		Point = SDL_Point();
+		Point.x = px;
+		Point.y = py;
+
+		HandlePrev = SDL_Point();
+		HandlePrev.x = hpx;
+		HandlePrev.y = hpy;
+
+		HandleNext = SDL_Point();
+		HandleNext.x = hnx;
+		HandleNext.y = hny;
+	}
+};
+
 int max(int i, int j)
 {
 	if (i < j)
@@ -27,6 +57,11 @@ void DrawPixel(SDL_Renderer* renderer, int x, int y)
 	SDL_RenderFillRect(renderer, r);
 }
 
+void DrawPixel(SDL_Renderer* renderer, SDL_Point p)
+{
+	DrawPixel(renderer, p.x, p.y);
+}
+
 SDL_Point GetPointOnLine(int x0, int y0, int x1, int y1, double t)
 {
 	SDL_Point p = SDL_Point();
@@ -34,6 +69,27 @@ SDL_Point GetPointOnLine(int x0, int y0, int x1, int y1, double t)
 	p.y = y0 + ( y1 - y0 ) * t;
 
 	return p;
+}
+
+SDL_Point GetPointOnLine(SDL_Point p1, SDL_Point p2, double t)
+{
+	SDL_Point p = SDL_Point();
+	p.x = p1.x + ( p2.x - p1.x ) * t;
+	p.y = p1.y + ( p2.y - p1.y ) * t;
+
+	return p;
+}
+
+SDL_Point GetPointOnBezier(SDL_Point p1, SDL_Point t1, SDL_Point p2, SDL_Point t2, double t)
+{
+	SDL_Point oneToTwo = GetPointOnLine(p1, t1, t);
+	SDL_Point twoTothree = GetPointOnLine(t1, t2, t);
+	SDL_Point ThreeToFour = GetPointOnLine(t2, p2, t);
+
+	SDL_Point oneToThree = GetPointOnLine(oneToTwo, twoTothree, t);
+	SDL_Point twoToFour = GetPointOnLine(twoTothree, ThreeToFour, t);
+
+	return GetPointOnLine(oneToThree, twoToFour, t);
 }
 
 void DrawLine(SDL_Renderer* renderer, int x0, int y0, int x1, int y1)
@@ -76,6 +132,11 @@ void DrawLine(SDL_Renderer* renderer, int x0, int y0, int x1, int y1)
 	}
 }
 
+void DrawLine(SDL_Renderer* renderer, SDL_Point p1, SDL_Point p2)
+{
+	DrawLine(renderer, p1.x, p1.y, p2.x, p2.y);
+}
+
 bool PointsClose(SDL_Point p0, SDL_Point p1)
 {
 	if (pow(p0.x - p1.x, 2) + pow(p0.y - p1.y, 2) < 100)
@@ -83,49 +144,45 @@ bool PointsClose(SDL_Point p0, SDL_Point p1)
 	return false;
 }
 
-SDL_Point p1 = SDL_Point();
-SDL_Point p2 = SDL_Point();
-SDL_Point t1 = SDL_Point();
-SDL_Point t2 = SDL_Point();
-SDL_Point* points[5];
-int selected = 0;
+
+BezierPoint* points[5];
+int pointsCount = 0;
+SDL_Point* selected = 0;
 bool mousePressed = false;
 SDL_Point mousePos = SDL_Point();
-double t = 0;
-//SDL_Point prevPixel = SDL_Point();
 void Prikoling(SDL_Renderer* renderer)
 {
-	SDL_SetRenderDrawColor(renderer, 125, 125, 125, 1);
-	SDL_Point prevPixel = GetPointOnLine(p1.x, p1.y, t1.x, t1.y, 0.0);
-	for (double i = 0; i < 1.01; i += 0.01)
+	for (int i = 0; i < pointsCount; i++)
 	{
-		SDL_Point oneToTwo = GetPointOnLine(p1.x, p1.y, t1.x, t1.y, i);
-		SDL_Point twoTothree = GetPointOnLine(t1.x, t1.y, t2.x, t2.y, i);
-		SDL_Point ThreeToFour = GetPointOnLine(t2.x, t2.y, p2.x, p2.y, i);
+		BezierPoint* point = points[i];
 
-		SDL_Point oneToThree = GetPointOnLine(oneToTwo.x, oneToTwo.y, twoTothree.x, twoTothree.y, i);
-		SDL_Point twoToFour = GetPointOnLine(twoTothree.x, twoTothree.y, ThreeToFour.x, ThreeToFour.y, i);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 255, 1);
+		DrawLine(renderer, point->Point, point->HandlePrev);
+		DrawLine(renderer, point->Point, point->HandleNext);
 
-		SDL_Point pixel = GetPointOnLine(oneToThree.x, oneToThree.y, twoToFour.x, twoToFour.y, i);
+		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 1);
+		DrawPixel(renderer, point->Point);
 
-		DrawLine(renderer, pixel.x, pixel.y, prevPixel.x, prevPixel.y);
+		SDL_SetRenderDrawColor(renderer, 255, 155, 0, 1);
+		DrawPixel(renderer, point->HandleNext);
+		DrawPixel(renderer, point->HandlePrev);
 
-		prevPixel.x = pixel.x;
-		prevPixel.y = pixel.y;
+		//skip drawing curve for last point
+		if (i == pointsCount - 1)
+			break;
+
+		SDL_SetRenderDrawColor(renderer, 125, 125, 125, 1);
+		SDL_Point prevPixel = point->Point;
+		for (double t = 0; t < 1.0; t += 0.001)
+		{
+			SDL_Point pixel = GetPointOnBezier(point->Point, point->HandleNext, points[i + 1]->Point, points[i + 1]->HandlePrev, t);
+
+			DrawLine(renderer, pixel.x, pixel.y, prevPixel.x, prevPixel.y);
+
+			prevPixel.x = pixel.x;
+			prevPixel.y = pixel.y;
+		}
 	}
-
-	SDL_SetRenderDrawColor(renderer, 0, 0, 255, 1);
-	DrawLine(renderer, p1.x, p1.y, t1.x, t1.y);
-	DrawLine(renderer, p2.x, p2.y, t2.x, t2.y);
-
-	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 1);
-	DrawPixel(renderer, p1.x, p1.y);
-	DrawPixel(renderer, p2.x, p2.y);
-
-	SDL_SetRenderDrawColor(renderer, 255, 155, 0, 1);
-	DrawPixel(renderer, t1.x, t1.y);
-	DrawPixel(renderer, t2.x, t2.y);
-
 
 	SDL_Event evnt;
 	while (SDL_PollEvent(&evnt))
@@ -135,8 +192,6 @@ void Prikoling(SDL_Renderer* renderer)
 			mousePos.x = evnt.motion.x;
 			mousePos.y = evnt.motion.y;
 		}
-
-
 
 		if (evnt.type == SDL_MOUSEBUTTONUP)
 		{
@@ -150,45 +205,42 @@ void Prikoling(SDL_Renderer* renderer)
 			mousePressed = true;
 			std::cout << "DOWN" << std::endl;
 
-			selected = -1;
-			for (int i = 0; i < 4; i++)
+			selected = nullptr;
+			for (int i = 0; i < pointsCount; i++)
 			{
 				SDL_Point tPoint = SDL_Point();
-				tPoint.x = points[i]->x * pixelSize;
-				tPoint.y = points[i]->y * pixelSize;
+				tPoint.x = points[i]->Point.x * pixelSize;
+				tPoint.y = points[i]->Point.y * pixelSize;
 				if (PointsClose(mousePos, tPoint))
-					selected = i;
+					selected = &points[i]->Point;
+
+				tPoint.x = points[i]->HandlePrev.x * pixelSize;
+				tPoint.y = points[i]->HandlePrev.y * pixelSize;
+				if (PointsClose(mousePos, tPoint))
+					selected = &points[i]->HandlePrev;
+
+				tPoint.x = points[i]->HandleNext.x * pixelSize;
+				tPoint.y = points[i]->HandleNext.y * pixelSize;
+				if (PointsClose(mousePos, tPoint))
+					selected = &points[i]->HandleNext;
 			}
 		}
 	}
 
-	if (mousePressed && selected != -1)
+	if (mousePressed && selected != nullptr)
 	{
-		points[selected]->x = mousePos.x / pixelSize;
-		points[selected]->y = mousePos.y / pixelSize;
+		selected->x = mousePos.x / pixelSize;
+		selected->y = mousePos.y / pixelSize;
 	}
-
-
-	/*t += 0.01;
-	if (t > 1)
-		t = 0;*/
 }
 
 int main(int argc, char* argv[])
 {
-	p1.x = 100;
-	p1.y = 100;
-	p2.x = 200;
-	p2.y = 200;
-	t1.x = 200;
-	t1.y = 100;
-	t2.x = 200;
-	t2.y = 250;
+	points[0] = &BezierPoint(100, 100, 0, 100, 200, 100);
+	points[1] = &BezierPoint(100, 200, 0, 200, 200, 200);
+	points[2] = &BezierPoint(100, 300, 0, 300, 200, 300);
 
-	points[0] = &p1;
-	points[1] = &p2;
-	points[2] = &t1;
-	points[3] = &t2;
+	pointsCount = 3;
 
 	if (SDL_Init(SDL_INIT_VIDEO) == 0)
 	{
