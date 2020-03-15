@@ -99,9 +99,15 @@ void Prikoling(SDL_Renderer* renderer)
 	SDL_Point prevPixel = GetPointOnLine(p1.x, p1.y, t1.x, t1.y, 0.0);
 	for (double i = 0; i < 1.01; i += 0.01)
 	{
-		SDL_Point oneToTwo = GetPointOnLine(p1.x, p1.y, t1.x, t1.y, t);
-		SDL_Point twoTothree = GetPointOnLine(t1.x, t1.y, t2.x, t2.y, t);
-		SDL_Point ThreeToFour = GetPointOnLine(t2.x, t2.y, p2.x, p2.y, t);
+		SDL_Point oneToTwo = GetPointOnLine(p1.x, p1.y, t1.x, t1.y, i);
+		SDL_Point twoTothree = GetPointOnLine(t1.x, t1.y, t2.x, t2.y, i);
+		SDL_Point ThreeToFour = GetPointOnLine(t2.x, t2.y, p2.x, p2.y, i);
+
+		SDL_Point oneToThree = GetPointOnLine(oneToTwo.x, oneToTwo.y, twoTothree.x, twoTothree.y, i);
+		SDL_Point twoToFour = GetPointOnLine(twoTothree.x, twoTothree.y, ThreeToFour.x, ThreeToFour.y, i);
+
+		SDL_Point pixel = GetPointOnLine(oneToThree.x, oneToThree.y, twoToFour.x, twoToFour.y, i);
+
 		DrawLine(renderer, pixel.x, pixel.y, prevPixel.x, prevPixel.y);
 
 		prevPixel.x = pixel.x;
@@ -163,9 +169,9 @@ void Prikoling(SDL_Renderer* renderer)
 	}
 
 
-	t += 0.01;
+	/*t += 0.01;
 	if (t > 1)
-		t = 0;
+		t = 0;*/
 }
 
 int main(int argc, char* argv[])
