@@ -1,6 +1,15 @@
 #include <SDL.h>
 #include <iostream>
-//#include "BuganDrawing.cpp"
+
+BezierPoint* points[5];
+int pointsCount = 0;
+SDL_Point* selected = 0;
+bool mousePressed = false;
+SDL_Point mousePos = SDL_Point();
+double _t = 0;
+bool pause = false;
+double tStep = 0.01;
+double _tStep = 0.01;
 
 struct BezierPoint
 {
@@ -166,15 +175,6 @@ bool PointsClose(SDL_Point p0, SDL_Point p1)
 }
 
 
-BezierPoint* points[5];
-int pointsCount = 0;
-SDL_Point* selected = 0;
-bool mousePressed = false;
-SDL_Point mousePos = SDL_Point();
-double _t = 0;
-bool pause = false;
-double tStep = 0.05;
-double _tStep = 0.01;
 void Prikoling(SDL_Renderer* renderer)
 {
 #pragma region DrawDefault
@@ -209,21 +209,63 @@ void Prikoling(SDL_Renderer* renderer)
 
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 1);
 	SDL_Point prevPixel = points[0]->Point;
-	for (double t = 0; t <= _t; t += 0.05)
+	SDL_Point p1 = GetPointOnBezier(points[0]->Point, points[0]->HandleNext, points[1]->Point, points[1]->HandlePrev, 0);
+	SDL_Point p2 = GetPointOnBezier(points[1]->Point, points[1]->HandleNext, points[2]->Point, points[2]->HandlePrev, 0);
+	SDL_Point t1 = GetPointOnBezier(points[2]->Point, points[2]->HandleNext, points[3]->Point, points[3]->HandlePrev, 0);
+	SDL_Point t2 = GetPointOnBezier(points[3]->Point, points[3]->HandleNext, points[0]->Point, points[0]->HandlePrev, 0);
+	for (double t = 0; t <= _t; t += tStep)
 	{
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 1);
 
-		/*SDL_Point p1 = GetPointOnBezier(points[0]->Point, points[0]->HandleNext, points[1]->Point, points[1]->HandlePrev, t);
-		SDL_Point p2 = GetPointOnBezier(points[1]->Point, points[1]->HandleNext, points[2]->Point, points[2]->HandlePrev, t);
-		SDL_Point t1 = GetPointOnBezier(points[2]->Point, points[2]->HandleNext, points[3]->Point, points[3]->HandlePrev, t);
-		SDL_Point t2 = GetPointOnBezier(points[3]->Point, points[3]->HandleNext, points[0]->Point, points[0]->HandlePrev, t);
-		SDL_Point pixel = GetPointOnBezier(p1, t1, p1, t2, t);
+		p1 = GetPointOnBezier(points[0]->Point, points[0]->HandleNext, points[1]->Point, points[1]->HandlePrev, t);
+		p2 = GetPointOnBezier(points[1]->Point, points[1]->HandleNext, points[2]->Point, points[2]->HandlePrev, t);
+		t1 = GetPointOnBezier(points[2]->Point, points[2]->HandleNext, points[3]->Point, points[3]->HandlePrev, t);
+		t2 = GetPointOnBezier(points[3]->Point, points[3]->HandleNext, points[0]->Point, points[0]->HandlePrev, t);
+		SDL_Point pixel = GetPointOnBezier(p1, t1, p2, t2, t);
 
 		DrawLine(renderer, pixel.x, pixel.y, prevPixel.x, prevPixel.y);
 
 		prevPixel.x = pixel.x;
-		prevPixel.y = pixel.y;*/
+		prevPixel.y = pixel.y;
 	}
+
+	//DIsplay points and handles
+	//p1 - red, p2 - blue, t1 - magenta, t2 black
+	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 1);
+	DrawPixel(renderer, p1, 10);
+	SDL_SetRenderDrawColor(renderer, 0, 0, 255, 1);
+	DrawPixel(renderer, p2, 10);
+	SDL_SetRenderDrawColor(renderer, 255, 0, 255, 1);
+	DrawPixel(renderer, t1, 10);
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 1);
+	DrawPixel(renderer, t2, 10);
+
+
+	SDL_SetRenderDrawColor(renderer, 255, 255, 0, 1);
+	DrawLine(renderer, p1, p2);
+	DrawLine(renderer, p1, t1);
+	DrawLine(renderer, p2, t2);
+
+	//first order lines
+	SDL_SetRenderDrawColor(renderer, 125, 125, 0, 1);
+	SDL_Point oneToTwo = GetPointOnLine(p1, t1, _t);
+	SDL_Point twoTothree = GetPointOnLine(t1, t2, _t);
+	SDL_Point threeToFour = GetPointOnLine(t2, p2, _t);
+	DrawLine(renderer, oneToTwo, twoTothree);
+	DrawLine(renderer, twoTothree, threeToFour);
+	DrawLine(renderer, oneToTwo, twoTothree);
+
+	//second order lines
+	SDL_SetRenderDrawColor(renderer, 0, 0, 255, 1);
+	SDL_Point oneToThree = GetPointOnLine(oneToTwo, twoTothree, _t);
+	SDL_Point twoToFour = GetPointOnLine(twoTothree, threeToFour, _t);
+	DrawLine(renderer, oneToThree, twoToFour);
+	
+
+	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 1);
+	DrawPixel(renderer, GetPointOnLine(oneToThree, twoToFour, _t), 10);
+
+
 
 	//last drawn pixel
 	for (int i = 0; i < pointsCount; i++)
@@ -360,10 +402,10 @@ void Prikoling(SDL_Renderer* renderer)
 
 int main(int argc, char* argv[])
 {
-	points[0] = &BezierPoint(300, 100, 200, 100, 400, 100);
-	points[1] = &BezierPoint(400, 200, 400, 100, 400, 300);
-	points[2] = &BezierPoint(300, 300, 400, 300, 200, 300);
-	points[3] = &BezierPoint(200, 200, 200, 300, 200, 100);
+	points[0] = &BezierPoint(300, 100, 250, 100, 350, 100);
+	points[1] = &BezierPoint(300, 300, 350, 300, 250, 300);
+	points[2] = &BezierPoint(400, 200, 400, 150, 400, 250);
+	points[3] = &BezierPoint(200, 200, 200, 250, 200, 150);
 
 	pointsCount = 4;
 
